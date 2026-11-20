@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Meanwhile settings</title>
+<style>
+  :root { --acc: #a78bfa; --mint: #5eead4; --text: #ececf1; --muted: #a2a4b8; --line: rgba(255,255,255,.08); --bg: #13141c; --panel: #1b1c27;
+    --font: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, Inter, Cantarell, system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 var(--font); -webkit-font-smoothing: antialiased; }
+  body { padding: 22px 24px 28px; }
+  h1 { font-size: 20px; margin: 0; letter-spacing: -.01em; display: flex; align-items: center; gap: 10px; }
+  h1 .dots { display: inline-flex; gap: 4px; align-items: center; }
+  h1 .dots i { width: 7px; height: 7px; border-radius: 50%; background: #fff; opacity: .5; }
+  h1 .dots i:nth-child(2) { width: 10px; height: 10px; opacity: 1; background: linear-gradient(135deg, var(--acc), var(--mint)); }
+  .tag { color: var(--muted); margin: 4px 0 18px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; }
+  h2 { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; font-weight: 700; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 0; }
+  .row + .row { border-top: 1px solid var(--line); }
+  .row small { display: block; color: var(--muted); font-size: 12px; }
+  button { font: inherit; }
+  .btn { height: 32px; padding: 0 14px; border-radius: 9px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.06); color: var(--text); font-weight: 600; cursor: pointer; }
+  .btn:hover { background: rgba(255,255,255,.11); }
+  .btn.primary { background: var(--acc); border-color: transparent; color: #12121a; }
+  .btn.danger:hover { background: rgba(248,113,113,.15); border-color: rgba(248,113,113,.4); }
+  .key { min-width: 150px; height: 32px; padding: 0 12px; border-radius: 9px; border: 1px solid rgba(255,255,255,.14); background: rgba(0,0,0,.25);
+    color: var(--text); font-weight: 600; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+  .key.rec { border-color: var(--acc); box-shadow: 0 0 0 3px rgba(167,139,250,.25); color: var(--acc); }
+  .switch { position: relative; width: 40px; height: 22px; flex: none; }
+  .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .switch span { position: absolute; inset: 0; border-radius: 99px; background: rgba(255,255,255,.14); transition: .18s; cursor: pointer; }
+  .switch span::after { content: ""; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: .18s; }
+  .switch input:checked + span { background: var(--acc); }
+  .switch input:checked + span::after { transform: translateX(18px); }
+  .corners { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; width: 96px; height: 64px; padding: 6px; border-radius: 10px; border: 1px solid rgba(255,255,255,.14); background: rgba(0,0,0,.25); }
+  .corners button { border: 0; border-radius: 4px; background: rgba(255,255,255,.07); cursor: pointer; }
+  .corners button.on { background: var(--acc); }
+  input[type=number] { width: 64px; height: 32px; border-radius: 9px; border: 1px solid rgba(255,255,255,.14); background: rgba(0,0,0,.25); color: var(--text); text-align: center; font: inherit; }
+  .agent { display: flex; align-items: center; gap: 8px; }
+  .msg { font-size: 12px; color: var(--muted); white-space: pre-wrap; margin-top: 6px; }
+  .msg.ok { color: var(--mint); } .msg.err { color: #f87171; }
+  code, pre { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 12px; }
+  pre { background: rgba(0,0,0,.3); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; white-space: pre-wrap; word-break: break-all; margin: 6px 0 0; user-select: text; }
+  .foot { color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; align-items: center; margin-top: 14px; gap: 8px; flex-wrap: wrap; }
+  .foot a { color: var(--muted); cursor: pointer; text-decoration: underline; }
+  #toast { position: fixed; right: 18px; bottom: 16px; background: #24263a; border: 1px solid var(--line); padding: 7px 12px; border-radius: 9px; font-size: 12.5px; opacity: 0; transition: .2s; pointer-events: none; }
+  #toast.on { opacity: 1; }
+  .err-line { color: #f87171; font-size: 12px; }
+</style>
+</head>
+<body>
+  <h1><span class="dots"><i></i><i></i><i></i></span> Meanwhile</h1>
+  <div class="tag">Something to do while your AI thinks. It pops up when your agent starts working and pulls you back when the answer is ready.</div>
+
+  <section>
+    <h2>Connect your agent</h2>
+    <div class="row"><div>Claude Code<small id="claudeFile"></small></div>
+      <div class="agent"><button class="btn danger" data-agent="claude" data-remove="1">Remove</button><button class="btn primary" data-agent="claude">Connect</button></div></div>
+    <div class="row"><div>Codex (CLI and desktop app)<small id="codexFile"></small></div>
+      <div class="agent"><button class="btn danger" data-agent="codex" data-remove="1">Remove</button><button class="btn primary" data-agent="codex">Connect</button></div></div>
+    <div class="msg" id="agentMsg">Adds two hooks (prompt submitted → start, turn finished → done). Your existing hooks are kept and a backup is written next to the file.</div>
+  </section>
+
+  <section>
+    <h2>Behaviour</h2>
+    <div class="row"><div>Pop up while an agent is thinking<small>Off = only the hotkey opens it</small></div><label class="switch"><input type="checkbox" id="auto"><span></span></label></div>
+    <div class="row"><div>Wait before popping up<small>Quick answers won't flash the overlay</small></div><div><input type="number" id="delay" min="0" max="120"> s</div></div>
+    <div class="row"><div>Hotkey<small id="hkHint">Click, then press the new combination</small><div class="err-line" id="hkErr"></div></div><button class="key" id="hotkey"></button></div>
+    <div class="row"><div>Corner</div><div class="corners" id="corners">
+      <button data-c="top-left" title="Top left"></button><button data-c="top-right" title="Top right"></button>
+      <button data-c="bottom-left" title="Bottom left"></button><button data-c="bottom-right" title="Bottom right"></button></div></div>
+    <div class="row"><div id="autostartLabel">Start with Windows</div><label class="switch"><input type="checkbox" id="autostart"><span></span></label></div>
+  </section>
+
+  <section>
+    <h2>Activities</h2>
+    <div class="row"><div>Body<small>Stretch, water, 20-20-20 eye break, slow breaths</small></div><label class="switch"><input type="checkbox" data-act="body"><span></span></label></div>
+    <div class="row"><div>Brain<small>Mental math sprint, reaction test, English flashcard</small></div><label class="switch"><input type="checkbox" data-act="brain"><span></span></label></div>
+    <div class="row"><div>Focus<small>"What will you check first?", shown back when the answer lands</small></div><label class="switch"><input type="checkbox" data-act="focus"><span></span></label></div>
+  </section>
+
+  <section>
+    <h2>Other agents and scripts</h2>
+    <div style="color:var(--muted);font-size:12.5px">Run these from any hook, script or Makefile:</div>
+    <pre id="cmds"></pre>
+  </section>
+
+  <div class="foot"><span id="ver"></span><span><a id="preview">Preview overlay</a> · <a id="openCfg">Open config folder</a></span></div>
+  <div id="toast">Saved</div>
+<script>
+(function () {
+  const { invoke } = window.__TAURI__.core;
+  const $ = (id) => document.getElementById(id);
+  let st = null, cfg = null, recording = false;
+
+  const toast = (t) => { const el = $("toast"); el.textContent = t; el.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove("on"), 1300); };
+
+  async function save() {
+    try { await invoke("save_config", { config: cfg }); $("hkErr").textContent = ""; toast("Saved"); }
+    catch (e) { $("hkErr").textContent = String(e); await load(); }
+  }
+
+  function render() {
+    $("auto").checked = cfg.auto_trigger;
+    $("delay").value = cfg.start_delay_seconds;
+    $("hotkey").textContent = cfg.hotkey;
+    $("autostart").checked = cfg.autostart;
+    for (const b of $("corners").children) b.classList.toggle("on", b.dataset.c === cfg.corner);
+    for (const i of document.querySelectorAll("[data-act]")) i.checked = cfg.activities[i.dataset.act];
+  }
+
+  async function load() {
+    st = await invoke("get_state");
+    cfg = st.config;
+    $("claudeFile").textContent = st.claudeFile || "";
+    $("codexFile").textContent = st.codexFile || "";
+    $("autostartLabel").textContent = st.os === "windows" ? "Start with Windows" : "Start at login";
+    $("ver").textContent = `v${st.version} · port ${cfg.port}`;
+    if (st.hotkeyError) $("hkErr").textContent = st.hotkeyError;
+    if (st.serverError) $("agentMsg").textContent = st.serverError;
+    const exe = `"${String(st.hookExe).replace(/\\/g, "/")}"`;
+    $("cmds").textContent = `${exe} start --from myagent\n${exe} done --from myagent\n${exe} status`;
+    render();
+  }
+
+  $("auto").onchange = (e) => { cfg.auto_trigger = e.target.checked; save(); };
+  $("autostart").onchange = (e) => { cfg.autostart = e.target.checked; save(); };
+  $("delay").onchange = (e) => { cfg.start_delay_seconds = Math.max(0, Math.min(120, parseInt(e.target.value || "0", 10))); save(); };
+  for (const b of $("corners").children) b.onclick = () => { cfg.corner = b.dataset.c; render(); save(); };
+  for (const i of document.querySelectorAll("[data-act]")) i.onchange = () => {
+    cfg.activities[i.dataset.act] = i.checked;
+    if (!cfg.activities.body && !cfg.activities.brain && !cfg.activities.focus) { cfg.activities.body = true; render(); }
+    save();
+  };
+
+  // hotkey recorder
+  const keyName = (e) => {
+    const c = e.code;
+    if (/^Key[A-Z]$/.test(c)) return c.slice(3);
+    if (/^Digit[0-9]$/.test(c)) return c.slice(5);
+    if (/^F([1-9]|1[0-9]|2[0-4])$/.test(c)) return c;
+    const map = { Space: "Space", Backquote: "Backquote", Minus: "Minus", Equal: "Equal", BracketLeft: "BracketLeft", BracketRight: "BracketRight",
+      Semicolon: "Semicolon", Quote: "Quote", Comma: "Comma", Period: "Period", Slash: "Slash", Backslash: "Backslash", Enter: "Enter",
+      ArrowUp: "ArrowUp", ArrowDown: "ArrowDown", ArrowLeft: "ArrowLeft", ArrowRight: "ArrowRight", Home: "Home", End: "End", PageUp: "PageUp", PageDown: "PageDown", Insert: "Insert", Delete: "Delete" };
+    return map[c] || null;
+  };
+  $("hotkey").onclick = () => { recording = true; $("hotkey").classList.add("rec"); $("hotkey").textContent = "Press keys…"; $("hkHint").textContent = "Esc to cancel"; };
+  window.addEventListener("keydown", (e) => {
+    if (!recording) return;
+    e.preventDefault();
+    if (e.key === "Escape") { recording = false; $("hotkey").classList.remove("rec"); $("hkHint").textContent = "Click, then press the new combination"; render(); return; }
+    const k = keyName(e);
+    if (!k) return; // waiting for a non-modifier key
+    const mods = [];
+    if (e.ctrlKey) mods.push("Ctrl");
+    if (e.altKey) mods.push("Alt");
+    if (e.shiftKey) mods.push("Shift");
+    if (e.metaKey) mods.push("Super");
+    if (!mods.length && !/^F\d+$/.test(k)) { $("hkErr").textContent = "Use at least one modifier (Ctrl, Alt, Shift)."; return; }
+    recording = false;
+    $("hotkey").classList.remove("rec");
+    $("hkHint").textContent = "Click, then press the new combination";
+    cfg.hotkey = [...mods, k].join("+");
+    render();
+    save();
+  });
+
+  for (const b of document.querySelectorAll("[data-agent]")) b.onclick = async () => {
+    const m = $("agentMsg");
+    try { const r = await invoke("setup_agent", { agent: b.dataset.agent, remove: !!b.dataset.remove }); m.className = "msg ok"; m.textContent = r; }
+    catch (e) { m.className = "msg err"; m.textContent = String(e); }
+  };
+  $("openCfg").onclick = () => invoke("open_config_folder");
+  $("preview").onclick = () => invoke("toggle_overlay");
+  load();
+})();
+</script>
+</body>
+</html>

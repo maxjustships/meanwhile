@@ -1,0 +1,185 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: System libraries (WebKitGTK, tray)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev xvfb
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Unit tests (config, hook merging)
+        run: cargo test -p meanwhile-core
+      - name: Build
+        run: cargo build --release
+      - name: Package
+        run: |
+          mkdir -p dist/pkg
+          cp target/release/meanwhile target/release/meanwhile-hook dist/pkg/
+          cp linux/meanwhile.desktop dist/pkg/
+          cp app/icons/128x128.png dist/pkg/meanwhile.png
+          tar -C dist/pkg -czf dist/meanwhile-linux.tar.gz .
+          ls -la dist
+      - name: Smoke run (Xvfb) + installer test (fake HOME)
+        run: |
+          set -e
+          export MEANWHILE_CONFIG_DIR="$RUNNER_TEMP/cfg"
+          xvfb-run -a ./target/release/meanwhile --autostart &
+          for i in $(seq 1 30); do ./target/release/meanwhile-hook status && break; sleep 1; done
+          ./target/release/meanwhile-hook start --from ci -v
+          ./target/release/meanwhile-hook done --from ci -v
+          ./target/release/meanwhile-hook status
+          cat "$MEANWHILE_CONFIG_DIR/meanwhile.log"
+          kill %1 || true
+          (cd dist && sha256sum meanwhile-linux.tar.gz > SHA256SUMS)
+          export HOME="$RUNNER_TEMP/home"; mkdir -p "$HOME/.claude"
+          echo '{"effortLevel":"high"}' > "$HOME/.claude/settings.json"
+          MEANWHILE_BASE_URL="file://$PWD/dist" MEANWHILE_NO_LAUNCH=1 sh install.sh
+          test -x "$HOME/.local/bin/meanwhile"
+          "$HOME/.local/bin/meanwhile-hook" version
+          grep -q 'meanwhile-hook' "$HOME/.claude/settings.json"
+          grep -q 'effortLevel' "$HOME/.claude/settings.json"
+          sh install.sh --uninstall
+          test ! -e "$HOME/.local/bin/meanwhile"
+          if grep -q 'meanwhile-hook' "$HOME/.claude/settings.json"; then echo "hook left behind"; exit 1; fi
+          grep -q 'effortLevel' "$HOME/.claude/settings.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/meanwhile-linux.tar.gz
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Unit tests
+        run: cargo test -p meanwhile-core
+      - name: Build
+        run: cargo build --release
+      - name: Package
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path target\release\meanwhile.exe, target\release\meanwhile-hook.exe -DestinationPath dist\Meanwhile-win-x64.zip -Force
+          Get-ChildItem dist
+      - name: Installer smoke test (sandboxed folders, real app start)
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $sand = Join-Path $env:RUNNER_TEMP 'sand'
+          New-Item -ItemType Directory -Force "$sand\lad", "$sand\menu", "$sand\cfg", "$sand\claude", "$sand\codex" | Out-Null
+          '{ "hooks": { "Stop": [ { "hooks": [ { "type": "command", "command": "other.py", "timeout": 3 } ] } ] } }' | Set-Content "$sand\codex\hooks.json"
+          $env:LOCALAPPDATA = "$sand\lad"
+          $env:MEANWHILE_START_MENU = "$sand\menu"
+          $env:MEANWHILE_CONFIG_DIR = "$sand\cfg"
+          $env:CLAUDE_CONFIG_DIR = "$sand\claude"
+          $env:CODEX_HOME = "$sand\codex"
+          $env:MEANWHILE_NO_AUTOSTART = '1'
+          $env:MEANWHILE_BASE_URL = ([Uri](Resolve-Path dist).Path).AbsoluteUri
+          (Get-FileHash dist\Meanwhile-win-x64.zip -Algorithm SHA256).Hash.ToLower() + '  Meanwhile-win-x64.zip' | Set-Content dist\SHA256SUMS
+          iex (Get-Content windows\install.ps1 -Raw)
+          if (-not (Test-Path "$sand\lad\Meanwhile\meanwhile.exe")) { throw 'meanwhile.exe was not installed' }
+          if (-not (Test-Path "$sand\menu\Meanwhile.lnk")) { throw 'no Start menu shortcut' }
+          $hk = "$sand\lad\Meanwhile\meanwhile-hook.exe"
+          $ok = $false
+          for ($i = 0; $i -lt 30; $i++) { & $hk status; if ($LASTEXITCODE -eq 0) { $ok = $true; break }; Start-Sleep 1 }
+          if (-not $ok) { Get-Content "$sand\cfg\meanwhile.log" -ErrorAction SilentlyContinue; throw 'app did not answer' }
+          & $hk start --from ci -v
+          & $hk done --from ci -v
+          Get-Content "$sand\cfg\meanwhile.log"
+          $j = Get-Content "$sand\codex\hooks.json" -Raw | ConvertFrom-Json
+          if ($j.hooks.Stop[0].hooks[0].command -ne 'other.py') { throw 'existing codex hook was not kept' }
+          if (-not ($j.hooks.UserPromptSubmit[0].hooks[0].command -like '*meanwhile-hook*')) { throw 'codex hook not added' }
+          iex (Get-Content windows\uninstall.ps1 -Raw)
+          if (Test-Path "$sand\lad\Meanwhile") { throw 'uninstall left files behind' }
+          $j = Get-Content "$sand\codex\hooks.json" -Raw | ConvertFrom-Json
+          if ($j.hooks.Stop[0].hooks[0].command -ne 'other.py') { throw 'uninstall broke the existing codex hook' }
+          if ($j.hooks.UserPromptSubmit) { throw 'uninstall left our codex hook' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/Meanwhile-win-x64.zip
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+      - name: Unit tests
+        run: cargo test -p meanwhile-core
+      - name: Build (arm64 + x86_64), ad-hoc sign
+        run: |
+          cargo build --release --target aarch64-apple-darwin
+          cargo build --release --target x86_64-apple-darwin
+          mkdir -p dist/pkg
+          for b in meanwhile meanwhile-hook; do
+            lipo -create -output dist/pkg/$b target/aarch64-apple-darwin/release/$b target/x86_64-apple-darwin/release/$b
+            codesign --force -s - --identifier dev.maxjustships.$b dist/pkg/$b
+          done
+          file dist/pkg/meanwhile
+          ./dist/pkg/meanwhile --version
+          ./dist/pkg/meanwhile-hook version
+          tar -C dist/pkg -czf dist/meanwhile-macos.tar.gz .
+      - name: "Smoke run on the CI runner (informational)"
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          export MEANWHILE_CONFIG_DIR="$RUNNER_TEMP/cfg"
+          ./dist/pkg/meanwhile --autostart &
+          for i in $(seq 1 20); do ./dist/pkg/meanwhile-hook status && break; sleep 1; done
+          ./dist/pkg/meanwhile-hook start --from ci -v
+          ./dist/pkg/meanwhile-hook done --from ci -v
+          cat "$MEANWHILE_CONFIG_DIR/meanwhile.log" || true
+          kill %1 || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/meanwhile-macos.tar.gz
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [linux, windows, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Collect files + checksums
+        run: |
+          mkdir -p release
+          cp artifacts/* release/
+          cp windows/install.ps1 windows/uninstall.ps1 install.sh release/
+          cd release && sha256sum Meanwhile-win-x64.zip meanwhile-linux.tar.gz meanwhile-macos.tar.gz > SHA256SUMS && cat SHA256SUMS
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" release/* \
+            --title "Meanwhile $GITHUB_REF_NAME" \
+            --notes-file .github/release-notes.md \
+            --verify-tag

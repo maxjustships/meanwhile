@@ -1,0 +1,26 @@
+[package]
+name = "meanwhile"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Something to do while your AI thinks"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+meanwhile-core = { path = "../crates/core" }
+tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api"] }
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-autostart = "2"
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tiny_http = "0.12"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

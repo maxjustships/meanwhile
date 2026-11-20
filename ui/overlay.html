@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meanwhile</title>
+<link rel="stylesheet" href="overlay.css">
+</head>
+<body>
+<div id="card" class="card" data-cat="body" aria-live="polite">
+  <header>
+    <span class="chip"><i class="chip-dot"></i><span id="cat">Body</span></span>
+    <span id="title" class="title"></span>
+    <span id="score" class="score"></span>
+    <div class="actions">
+      <button id="skip" class="icon-btn" title="Something else" aria-label="Something else">
+        <svg viewBox="0 0 24 24" width="15" height="15"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button id="close" class="icon-btn" title="Close (Esc)" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="15" height="15"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </header>
+  <main id="stage"></main>
+  <footer>
+    <div class="status"><i id="pulse" class="pulse"></i><span id="status"></span></div>
+    <div class="bar"><i id="bar"></i></div>
+  </footer>
+</div>
+<script src="words.js"></script>
+<script src="activities.js"></script>
+<script src="overlay.js"></script>
+</body>
+</html>

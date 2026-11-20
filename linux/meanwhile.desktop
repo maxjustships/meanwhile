@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Meanwhile
+Comment=Something to do while your AI thinks
+Exec=@BIN@
+Icon=meanwhile
+Terminal=false
+Categories=Utility;
+StartupNotify=false

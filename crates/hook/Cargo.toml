@@ -1,0 +1,12 @@
+[package]
+name = "meanwhile-hook"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "meanwhile-hook"
+path = "src/main.rs"
+
+[dependencies]
+meanwhile-core = { path = "../core" }
