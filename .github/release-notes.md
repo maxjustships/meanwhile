@@ -12,7 +12,7 @@ The installer connects Claude Code and Codex hooks if it finds them (your other 
 
 **Status**
 
-- Windows: working, tested on Windows 10 22H2: tray, hotkey, autostart, overlay without focus stealing, Claude Code and Codex hooks. Windows 11 not tried.
+- Windows: working, tested on Windows 10 22H2: tray, global hotkey, autostart, overlay without focus stealing, and the hooks: a real Codex turn (start → done with persisted hook trust) and Claude Code (start, and cancel when a turn fails). Windows 11 not tried.
 - Linux: working, smoke-tested on Arch + Hyprland (Wayland). The compositor may ignore the corner and always-on-top; see the README for a window rule.
 - macOS: **beta, untested on real hardware.** Built by GitHub Actions (universal, ad-hoc signed), but nobody has run it on a Mac yet.
 - Hermes Agent: optional plugin in `integrations/hermes`.
