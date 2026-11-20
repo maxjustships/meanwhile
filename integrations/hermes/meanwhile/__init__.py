@@ -48,7 +48,9 @@ def _ssh_cmd(verb: str) -> list[str]:
     cfg = os.environ.get("MEANWHILE_SSH_CONFIG") or os.path.expanduser("~/.config/superkompek/ssh.conf")
     if os.path.exists(cfg):
         cmd += ["-F", cfg]
-    cmd += ["-o", "BatchMode=yes", "-o", "ConnectTimeout=4", "-o", "LogLevel=ERROR", host, f'"{hook}" {verb} --from hermes']
+    # unquoted path works in both cmd and PowerShell (Windows OpenSSH default shell); quoting needs `&`
+    remote = f'& "{hook}" {verb} --from hermes' if " " in hook else f"{hook} {verb} --from hermes"
+    cmd += ["-o", "BatchMode=yes", "-o", "ConnectTimeout=4", "-o", "LogLevel=ERROR", host, remote]
     return cmd
 
 

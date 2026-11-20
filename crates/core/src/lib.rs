@@ -299,15 +299,21 @@ pub fn merge_hooks(doc: &str, agent: Agent, hook_exe: &Path, remove: bool) -> Re
         .and_then(|h| h.as_object_mut())
         .ok_or("\"hooks\" is not an object, left untouched")?;
 
-    let events: &[(&str, &str)] = &[("UserPromptSubmit", "start"), ("Stop", "done")];
+    // Claude Code also tells us when a turn dies on an API error (StopFailure) and when the
+    // session ends (SessionEnd): both cancel a pending wait so the overlay doesn't hang around.
+    let events: &[(&str, &str)] = match agent {
+        Agent::Claude => &[("UserPromptSubmit", "start"), ("Stop", "done"), ("StopFailure", "cancel"), ("SessionEnd", "cancel")],
+        Agent::Codex => &[("UserPromptSubmit", "start"), ("Stop", "done")],
+    };
+    const ALL_EVENTS: &[&str] = &["UserPromptSubmit", "Stop", "StopFailure", "SessionEnd"];
     let mut removed = 0;
-    for (ev, _) in events {
+    for ev in ALL_EVENTS {
         if let Some(arr) = hooks.get_mut(*ev).and_then(|a| a.as_array_mut()) {
             removed += strip_ours(arr);
         }
     }
     // drop event keys we emptied completely
-    for (ev, _) in events {
+    for ev in ALL_EVENTS {
         if hooks.get(*ev).and_then(|a| a.as_array()).map(|a| a.is_empty()).unwrap_or(false) {
             hooks.remove(*ev);
         }
@@ -332,7 +338,8 @@ pub fn merge_hooks(doc: &str, agent: Agent, hook_exe: &Path, remove: bool) -> Re
     }
     let out = serde_json::to_string_pretty(&root).unwrap() + "\n";
     let what = if removed > 0 { "updated" } else { "added" };
-    Ok((out, format!("{what} UserPromptSubmit -> start and Stop -> done")))
+    let extra = if agent == Agent::Claude { ", StopFailure/SessionEnd -> cancel" } else { "" };
+    Ok((out, format!("{what} UserPromptSubmit -> start and Stop -> done{extra}")))
 }
 
 /// Apply `merge_hooks` to the agent's real config file, with a timestamped backup next to it.

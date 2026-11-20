@@ -10,7 +10,6 @@ use std::time::{Duration, Instant};
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
-use tauri_plugin_autostart::ManagerExt as _;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 /// Overlay window size in logical px: a 360x240 card plus room for its shadow.
@@ -240,10 +239,16 @@ fn on_done(app: &AppHandle, from: String) -> &'static str {
     }
 }
 
+/// Cancel a pending wait (agent error, session ended). Does nothing when no wait is pending, so a
+/// late SessionEnd can't cut the "answer's ready" card short, and a hotkey-opened overlay stays.
 fn on_cancel(app: &AppHandle) -> &'static str {
     let s = st(app);
     let had = s.wait.lock().unwrap().take().is_some();
+    if !had {
+        return "nothing to cancel";
+    }
     s.gen.fetch_add(1, Ordering::SeqCst);
+    log("wait cancelled");
     let a = app.clone();
     let _ = app.run_on_main_thread(move || {
         if let Some(w) = overlay(&a) {
@@ -251,11 +256,7 @@ fn on_cancel(app: &AppHandle) -> &'static str {
         }
         request_hide(&a);
     });
-    if had {
-        "cancelled"
-    } else {
-        "nothing to cancel"
-    }
+    "cancelled"
 }
 
 // ---------------------------------------------------------------- HTTP endpoint
@@ -354,18 +355,29 @@ fn apply_hotkey(app: &AppHandle, hotkey: &str) -> Result<(), String> {
     gs.register(sc).map_err(|e| format!("could not register {hotkey} (taken by another app?): {e}"))
 }
 
-fn apply_autostart(app: &AppHandle, on: bool) {
-    let al = app.autolaunch();
-    let cur = al.is_enabled().unwrap_or(false);
-    let r = if on && !cur {
-        al.enable()
-    } else if !on && cur {
-        al.disable()
-    } else {
-        Ok(())
+/// Start-with-OS. Always per user (Windows HKCU Run, Linux ~/.config/autostart, macOS LaunchAgent),
+/// never machine-wide, even when the app happens to run elevated.
+fn apply_autostart(_app: &AppHandle, on: bool) {
+    let exe = match std::env::current_exe() {
+        Ok(p) => p.display().to_string(),
+        Err(e) => return log(&format!("autostart: no exe path: {e}")),
     };
-    if let Err(e) = r {
-        log(&format!("autostart: {e}"));
+    let al = auto_launch::AutoLaunchBuilder::new()
+        .set_app_name("Meanwhile")
+        .set_app_path(&exe)
+        .set_args(&["--autostart"])
+        .set_windows_enable_mode(auto_launch::WindowsEnableMode::CurrentUser)
+        .set_macos_launch_mode(auto_launch::MacOSLaunchMode::LaunchAgent)
+        .build();
+    let al = match al {
+        Ok(a) => a,
+        Err(e) => return log(&format!("autostart: {e}")),
+    };
+    // enable() just (re)writes the entry, which also fixes a stale path after a reinstall
+    let r = if on { al.enable() } else if al.is_enabled().unwrap_or(true) { al.disable() } else { Ok(()) };
+    match r {
+        Ok(()) => log(&format!("autostart {}", if on { "on" } else { "off" })),
+        Err(e) => log(&format!("autostart: {e}")),
     }
 }
 
@@ -600,10 +612,6 @@ fn main() {
                 open_settings(app)
             }
         }))
-        .plugin(tauri_plugin_autostart::init(
-            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            Some(vec!["--autostart"]),
-        ))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _sc, ev| {
