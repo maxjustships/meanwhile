@@ -108,7 +108,16 @@ jobs:
           if (-not $ok) { Get-Content "$sand\cfg\meanwhile.log" -ErrorAction SilentlyContinue; throw 'app did not answer' }
           & $hk start --from ci -v
           & $hk done --from ci -v
-          Get-Content "$sand\cfg\meanwhile.log"
+          # agents like Codex start hooks with a stripped environment (no SystemRoot): must still connect
+          $psi = New-Object System.Diagnostics.ProcessStartInfo
+          $psi.FileName = 'C:\Windows\System32\cmd.exe'
+          $psi.Arguments = '/C ""' + $hk + '" status"'
+          $psi.UseShellExecute = $false; $psi.RedirectStandardOutput = $true; $psi.CreateNoWindow = $true
+          $psi.EnvironmentVariables.Clear()
+          $psi.EnvironmentVariables['MEANWHILE_CONFIG_DIR'] = "$sand\cfg"
+          $p = [Diagnostics.Process]::Start($psi); $o = $p.StandardOutput.ReadToEnd(); $p.WaitForExit()
+          "empty-env status: exit=$($p.ExitCode) $o"
+          if ($p.ExitCode -ne 0) { throw 'meanwhile-hook cannot connect with a stripped environment' }
           $j = Get-Content "$sand\codex\hooks.json" -Raw | ConvertFrom-Json
           if ($j.hooks.Stop[0].hooks[0].command -ne 'other.py') { throw 'existing codex hook was not kept' }
           if (-not ($j.hooks.UserPromptSubmit[0].hooks[0].command -like '*meanwhile-hook*')) { throw 'codex hook not added' }

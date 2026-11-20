@@ -28,7 +28,20 @@ fn usage() -> ! {
     std::process::exit(2)
 }
 
+/// Some agents (Codex on Windows) start hooks with a stripped environment. Without `SystemRoot`
+/// Winsock can't load its providers and every connect fails with WSAEPROVIDERFAILEDINIT (10106),
+/// so put it back before the first socket is opened.
+#[cfg(windows)]
+fn repair_windows_env() {
+    if std::env::var_os("SystemRoot").is_none() {
+        let root = std::env::var_os("windir").unwrap_or_else(|| "C:\\Windows".into());
+        std::env::set_var("SystemRoot", root);
+    }
+}
+
 fn main() {
+    #[cfg(windows)]
+    repair_windows_env();
     let args: Vec<String> = std::env::args().skip(1).collect();
     let Some(cmd) = args.first().map(|s| s.as_str()) else { usage() };
     let verbose = args.iter().any(|a| a == "-v" || a == "--verbose");

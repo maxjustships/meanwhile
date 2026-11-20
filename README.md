@@ -10,7 +10,11 @@ You send a prompt. The agent needs a minute or two. You open a new tab "just for
 - **Local only.** No account, no telemetry, no network except a token-protected endpoint on `127.0.0.1`.
 - **Free and open source** (MIT).
 
-![Meanwhile overlay on a Windows desktop](docs/overlay-windows.png)
+| While the agent thinks | Before the answer lands | When it's done |
+|---|---|---|
+| ![Breathing activity](docs/overlay-windows.png) | ![Focus question](docs/overlay-windows-focus.png) | ![Answer ready](docs/overlay-windows-ready.png) |
+
+<sub>Real screenshots from a Windows 10 desktop, triggered by Claude Code and Hermes hooks.</sub>
 
 ## Install
 
