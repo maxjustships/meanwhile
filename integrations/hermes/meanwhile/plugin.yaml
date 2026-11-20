@@ -1,0 +1,7 @@
+name: meanwhile
+version: 0.1.0
+description: "Pokes the Meanwhile overlay (github.com/maxjustships/meanwhile) when a Hermes turn starts and ends, so the desktop shows a micro-break while Hermes thinks and pulls you back when the reply is ready. Runs meanwhile-hook over SSH (or HTTP) in the background; never blocks a turn."
+author: maxjustships
+hooks:
+  - pre_llm_call
+  - post_llm_call
