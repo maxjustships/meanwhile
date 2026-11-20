@@ -55,8 +55,9 @@ They rotate randomly. While the agent is still thinking, the next one starts by 
 The installer does this when it finds the agent. You can also click *Connect* in *tray → Settings*, or run it yourself:
 
 ```sh
-meanwhile-hook setup claude     # ~/.claude/settings.json  (UserPromptSubmit -> start, Stop -> done)
-meanwhile-hook setup codex      # ~/.codex/hooks.json      (same two events)
+meanwhile-hook setup claude     # ~/.claude/settings.json  UserPromptSubmit -> start, Stop -> done,
+                                #                          StopFailure + SessionEnd -> cancel
+meanwhile-hook setup codex      # ~/.codex/hooks.json      UserPromptSubmit -> start, Stop -> done
 meanwhile-hook setup codex --remove
 ```
 
@@ -66,12 +67,18 @@ What it adds (Claude Code, Windows path shown):
 
 ```json
 "hooks": {
-  "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "\"C:/Users/you/AppData/Local/Meanwhile/meanwhile-hook.exe\" start --from claude", "timeout": 5 }] }],
-  "Stop":             [{ "hooks": [{ "type": "command", "command": "\"C:/Users/you/AppData/Local/Meanwhile/meanwhile-hook.exe\" done --from claude", "timeout": 5 }] }]
+  "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "C:/Users/you/AppData/Local/Meanwhile/meanwhile-hook.exe start --from claude", "timeout": 5 }] }],
+  "Stop":             [{ "hooks": [{ "type": "command", "command": "C:/Users/you/AppData/Local/Meanwhile/meanwhile-hook.exe done --from claude", "timeout": 5 }] }],
+  "StopFailure":      [{ "hooks": [{ "type": "command", "command": "C:/Users/you/AppData/Local/Meanwhile/meanwhile-hook.exe cancel --from claude", "timeout": 5 }] }],
+  "SessionEnd":       [{ "hooks": [{ "type": "command", "command": "C:/Users/you/AppData/Local/Meanwhile/meanwhile-hook.exe cancel --from claude", "timeout": 5 }] }]
 }
 ```
 
-**Codex trusts hooks one by one.** New hooks stay inactive until you approve them once: `/hooks` in the Codex CLI (press `t` to trust), or *Review hooks* in the composer / *Settings → Hooks* in the Codex desktop app.
+`cancel` only clears a pending wait (a turn that died on an API error, or a session you quit mid-answer). It never cuts the "ready" card short.
+
+**Codex trusts hooks one by one.** New hooks stay inactive until you approve them once: `/hooks` in the Codex CLI (press `t` to trust), or *Review hooks* in the composer / *Settings → Hooks* in the Codex desktop app. Both the CLI and the desktop app read the same `~/.codex/hooks.json`.
+
+**Hermes Agent:** `integrations/hermes/meanwhile` is a Hermes plugin that sends start/done at the beginning and end of each turn (default: Telegram turns only), over SSH to the desktop running Meanwhile (`MEANWHILE_SSH_HOST`) or over HTTP (`MEANWHILE_URL` + `MEANWHILE_TOKEN`). Copy it to `~/.hermes/plugins/` and run `hermes plugins enable meanwhile`. Settings are in the plugin's docstring.
 
 **Anything else** (another agent, a build script, a long test run) can use the same two commands:
 
@@ -116,7 +123,7 @@ A log of hook calls is kept next to it (`meanwhile.log`, rotated at 256 KB), han
 
 ## Limitations
 
-- **Windows:** tested on Windows 10 (22H2) with Claude Code and the Codex desktop app. Windows 11 should behave the same but was not tried.
+- **Windows:** tested on Windows 10 (22H2) with the Claude Code and Codex CLIs. The Codex desktop app reads the same `hooks.json`; Windows 11 should behave the same but was not tried.
 - **Linux:** runs on Arch/Hyprland (smoke test). On Wayland the compositor decides where windows go and whether they stay on top, so the corner setting and always-on-top may be ignored; a window rule helps (Hyprland: `windowrule = float, pin, noborder, noshadow, title:^(Meanwhile)$`). The global hotkey needs X11/XWayland; on pure Wayland bind `meanwhile-hook toggle` in your compositor instead.
 - **macOS: BETA, untested on real hardware.** Built by GitHub Actions on `macos-latest` (universal binary, ad-hoc signed) but nobody has run it on a Mac yet. It runs as a menu-bar app without a Dock icon.
 - Several agents at once share one overlay: the first `done` shows "ready".

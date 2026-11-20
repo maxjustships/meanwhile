@@ -108,10 +108,14 @@ jobs:
           if (-not $ok) { Get-Content "$sand\cfg\meanwhile.log" -ErrorAction SilentlyContinue; throw 'app did not answer' }
           & $hk start --from ci -v
           & $hk done --from ci -v
-          # agents like Codex start hooks with a stripped environment (no SystemRoot): must still connect
+          # Run the generated Codex hook command the way Codex 0.144 does: cmd /C "<command, quotes
+          # escaped>" with a stripped environment (no SystemRoot). Must still reach the app.
+          $j0 = Get-Content "$sand\codex\hooks.json" -Raw | ConvertFrom-Json
+          $hc = ($j0.hooks.UserPromptSubmit[0].hooks[0].command) -replace ' start ', ' status '
+          "codex hook command: $hc"
           $psi = New-Object System.Diagnostics.ProcessStartInfo
           $psi.FileName = 'C:\Windows\System32\cmd.exe'
-          $psi.Arguments = '/C ""' + $hk + '" status"'
+          $psi.Arguments = '/C "' + ($hc -replace '"', '\"') + '"'
           $psi.UseShellExecute = $false; $psi.RedirectStandardOutput = $true; $psi.CreateNoWindow = $true
           $psi.EnvironmentVariables.Clear()
           $psi.EnvironmentVariables['MEANWHILE_CONFIG_DIR'] = "$sand\cfg"

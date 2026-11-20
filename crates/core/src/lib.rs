@@ -249,9 +249,38 @@ pub const MARKER: &str = "meanwhile-hook";
 
 /// Shell-safe command line for a hook entry. Forward slashes work in bash (Claude Code on Windows)
 /// and in cmd.exe (Codex on Windows).
+/// Unquoted on purpose: some agents (Codex on
+/// Windows) pass it to `cmd /C` with escaped quotes, which breaks a quoted path. A path with spaces
+/// becomes its 8.3 short form on Windows; elsewhere (or if short names are off) it gets quoted.
 pub fn hook_command(hook_exe: &Path, args: &str) -> String {
     let p = hook_exe.to_string_lossy().replace('\\', "/");
+    if !p.contains(' ') {
+        return format!("{p} {args}");
+    }
+    #[cfg(windows)]
+    if let Some(short) = short_path(hook_exe) {
+        let s = short.replace('\\', "/");
+        if !s.contains(' ') {
+            return format!("{s} {args}");
+        }
+    }
     format!("\"{p}\" {args}")
+}
+
+#[cfg(windows)]
+fn short_path(p: &Path) -> Option<String> {
+    use std::os::windows::ffi::OsStrExt;
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn GetShortPathNameW(long: *const u16, short: *mut u16, len: u32) -> u32;
+    }
+    let wide: Vec<u16> = p.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+    let mut buf = vec![0u16; 1024];
+    let n = unsafe { GetShortPathNameW(wide.as_ptr(), buf.as_mut_ptr(), buf.len() as u32) } as usize;
+    if n == 0 || n >= buf.len() {
+        return None;
+    }
+    Some(String::from_utf16_lossy(&buf[..n]))
 }
 
 fn is_ours(handler: &Value) -> bool {
@@ -408,7 +437,7 @@ mod tests {
         assert_eq!(v["hooks"]["Stop"][0]["hooks"][0]["command"], "py a.py hook");
         assert_eq!(
             v["hooks"]["Stop"][1]["hooks"][0]["command"],
-            "\"C:/Users/Lap/AppData/Local/Meanwhile/meanwhile-hook.exe\" done --from codex"
+            "C:/Users/Lap/AppData/Local/Meanwhile/meanwhile-hook.exe done --from codex"
         );
         assert!(v["hooks"]["UserPromptSubmit"][0]["hooks"][0]["command"]
             .as_str()

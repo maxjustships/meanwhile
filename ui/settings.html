@@ -59,7 +59,7 @@
       <div class="agent"><button class="btn danger" data-agent="claude" data-remove="1">Remove</button><button class="btn primary" data-agent="claude">Connect</button></div></div>
     <div class="row"><div>Codex (CLI and desktop app)<small id="codexFile"></small></div>
       <div class="agent"><button class="btn danger" data-agent="codex" data-remove="1">Remove</button><button class="btn primary" data-agent="codex">Connect</button></div></div>
-    <div class="msg" id="agentMsg">Adds two hooks (prompt submitted → start, turn finished → done). Your existing hooks are kept and a backup is written next to the file.</div>
+    <div class="msg" id="agentMsg">Adds hooks for prompt submitted → start and turn finished → done (Claude Code also: turn failed or session ended → stop waiting). Your existing hooks are kept and a backup is written next to the file. Codex runs new hooks after one approval: Review hooks in the composer, or Settings → Hooks.</div>
   </section>
 
   <section>
